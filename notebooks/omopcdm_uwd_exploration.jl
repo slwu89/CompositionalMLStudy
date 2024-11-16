@@ -50,24 +50,34 @@ db_visit_occurrence = execute(conn, "SELECT * FROM visit_occurrence;") |> DataFr
 db_condition_occurrence = execute(conn, "SELECT * FROM condition_occurrence;") |> DataFrame
 
 db_person.person_id = Int.(db_person.person_id)
+db_visit_occurrence.visit_occurrence_id = Int.(db_visit_occurrence.visit_occurrence_id)
 db_visit_occurrence.person_id = Int.(db_visit_occurrence.person_id)
 db_condition_occurrence.person_id = Int.(db_condition_occurrence.person_id)
+db_condition_occurrence.visit_occurrence_id = map(x -> ismissing(x) ? x : Int(x), db_condition_occurrence.visit_occurrence_id)
 
-# need to subset to the part of the data which will be internally consistent
-people_id = intersect(db_visit_occurrence.person_id, db_condition_occurrence.person_id)
+# delete rows with invalid foreign key col
+deleteat!(
+    db_condition_occurrence,
+    ismissing.(db_condition_occurrence.visit_occurrence_id)
+)
 
-filter!(:person_id => x -> x ∈ people_id , db_person)
-filter!(:person_id => x -> x ∈ people_id , db_visit_occurrence)
-filter!(:person_id => x -> x ∈ people_id , db_condition_occurrence)
+# the foreign key columns map into the foreign key column, but Catlab/ACSets can only use "part ID" (sequential integers)
+# as the "primary key" of each table, so we need to remap them so they point at the row of the corresponding table rather
+# than the "primary key" column. Now the primary keys are the row numbers. 
 
-people_id_remap = Dict([
-    id => ix
-    for (ix, id) in enumerate(people_id)
-])
+# VisitOccurrence -> Person
+db_visit_occurrence.person_id = map(x -> findfirst(db_person.person_id .== x), db_visit_occurrence.person_id)
 
-db_person.person_id = [people_id_remap[id] for id in db_person.person_id]
-db_visit_occurrence.person_id = [people_id_remap[id] for id in db_visit_occurrence.person_id]
-db_condition_occurrence.person_id = [people_id_remap[id] for id in db_condition_occurrence.person_id]
+# ConditionOccurrence -> Person
+db_condition_occurrence.person_id = map(x -> findfirst(db_person.person_id .== x), db_condition_occurrence.person_id)
+
+# ConditionOccurrence -> VisitOccurrrence
+db_condition_occurrence.visit_occurrence_id = map(x -> findfirst(db_visit_occurrence.visit_occurrence_id .== x), db_condition_occurrence.visit_occurrence_id)
+
+deleteat!(
+    db_condition_occurrence,
+    isnothing.(db_condition_occurrence.visit_occurrence_id)
+)
 
 # acset stuff
 using Catlab
@@ -97,12 +107,21 @@ for p in eachrow(db_person)
 end
 
 add_parts!(omop_acs, :VisitOccurrence, nrow(db_visit_occurrence), visit_person=db_visit_occurrence.person_id)
-for x in eachrow(db_condition_occurrence)
-    if !ismissing(x.visit_occurrence_id) && Int(x.visit_occurrence_id) <= nparts(omop_acs, :VisitOccurrence)
-        add_part!(
-            omop_acs, :ConditionOccurrence,
-            condition_person=x.person_id, condition_visit=Int(x.visit_occurrence_id)
-        
-        )
-    end
+
+add_parts!(
+    omop_acs, :ConditionOccurrence, nrow(db_condition_occurrence), 
+    condition_person=db_condition_occurrence.person_id, condition_visit=db_condition_occurrence.visit_occurrence_id
+)
+
+# use a UWD to create conjunctive query to retrieve complete data set for an individual
+person_query = @relation (Person=p_id, PersonDOB=p_dob, Visit=v_id, Condition=c_id) begin
+    Person(_id=p_id, dob=p_dob)
+    VisitOccurrence(_id=v_id, visit_person=p_id)
+    ConditionOccurrence(_id=c_id, condition_visit=v_id, condition_person=p_id)
 end
+
+# all rows
+query(omop_acs, person_query)
+
+# a specific person
+query(omop_acs, person_query, (p_id=146,))
