@@ -48,6 +48,24 @@ db_tables = DataFrame(execute(conn, sql))
 db_person = execute(conn, "SELECT * FROM person;") |> DataFrame
 db_visit_occurrence = execute(conn, "SELECT * FROM visit_occurrence;") |> DataFrame
 db_condition_occurrence = execute(conn, "SELECT * FROM condition_occurrence;") |> DataFrame
+# db_death = execute(conn, "SELECT * FROM death;") |> DataFrame empty?
+# db_visit_detail = execute(conn, "SELECT * FROM visit_detail;") |> DataFrame # empty?
+db_drug_exposure = execute(conn, "SELECT * FROM drug_exposure;") |> DataFrame
+db_procedure_occurrence = execute(conn, "SELECT * FROM procedure_occurrence;") |> DataFrame
+# db_device_exposure = execute(conn, "SELECT * FROM device_exposure;") |> DataFrame
+db_measurement = execute(conn, "SELECT * FROM measurement;") |> DataFrame
+db_observation = execute(conn, "SELECT * FROM observation;") |> DataFrame
+# db_note = execute(conn, "SELECT * FROM note;") |> DataFrame
+# db_note_nlp = execute(conn, "SELECT * FROM note_nlp;") |> DataFrame
+# db_episode = execute(conn, "SELECT * FROM episode;") |> DataFrame # not present?
+# db_episode_event = execute(conn, "SELECT * FROM episode_event;") |> DataFrame
+# db_specimen = execute(conn, "SELECT * FROM specimen;") |> DataFrame
+# db_fact_relationship = execute(conn, "SELECT * FROM fact_relationship;") |> DataFrame
+
+# red tables
+# db_location = execute(conn, "SELECT * FROM location;") |> DataFrame
+# db_care_site = execute(conn, "SELECT * FROM care_site;") |> DataFrame
+# db_provider = execute(conn, "SELECT * FROM provider;") |> DataFrame
 
 db_person.person_id = Int.(db_person.person_id)
 db_visit_occurrence.visit_occurrence_id = Int.(db_visit_occurrence.visit_occurrence_id)
